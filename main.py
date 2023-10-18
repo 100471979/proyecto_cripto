@@ -18,6 +18,8 @@ layout = [
     [sg.Submit('Aceptar'), sg.Exit('Salir')]
 ]
 
+
+
 window = sg.Window('App Cripto', layout)
 
 #función para vaciar el input
