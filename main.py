@@ -4,6 +4,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import pandas as pd
 import PySimpleGUI as sg
 
+
 #color de la ventana
 sg.theme('DarkRed')
 
