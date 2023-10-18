@@ -1,1 +1,1 @@
-salt
+ast.literal_eval(salt))
