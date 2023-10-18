@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-
-=======
->>>>>>> 4c40612a2a3a590985bc2c38e00d6b4453306376
 import os
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -78,8 +74,4 @@ while True:
                 sg.popup_error('Tus datos no coinciden con la base')           
             clear_input()   
 
-<<<<<<< HEAD
 window.close()
-=======
-window.close()
->>>>>>> 4c40612a2a3a590985bc2c38e00d6b4453306376
