@@ -1,7 +1,13 @@
 import os
+import re
 import ast
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import padding
 import pandas as pd
 import PySimpleGUI as sg
 
@@ -12,7 +18,8 @@ sg.theme('DarkRed')
 
 EXCEL_FILE = './datos_cripto.xlsx'
 data_frame = pd.read_excel(EXCEL_FILE)
-
+data_frame2 = pd.read_excel("./Coordenadas.xlsx")
+data_frame3 = pd.read_excel("./Claves_privadas.xlsx")
 
 """for index, row in data_frame.iterrows():
     salt = os.urandom(16)
@@ -29,6 +36,37 @@ data_frame = pd.read_excel(EXCEL_FILE)
     key = kdf.derive(contraseña_bytes)
     data_frame.at[index, 'Key'] = key
     data_frame.to_excel('./datos_cripto.xlsx', index=False)"""
+
+"""for index, row in data_frame3.iterrows():
+    private_key = rsa.generate_private_key(
+    public_exponent=65537,
+    key_size=2048,
+    )
+    pem = private_key.private_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PrivateFormat.PKCS8,
+    encryption_algorithm=serialization.NoEncryption()
+    )
+
+    pem.splitlines()[0]
+    data_frame3.at[index, 'Privadas'] = pem
+    data_frame3.to_excel('./Claves_privadas.xlsx', index=False)"""
+
+"""for index, row in data_frame.iterrows():
+    nickname1 = row['Nickname']
+    for index, row in data_frame3.iterrows():
+        nickname2 = row['Nickname']
+        privada = row['Privadas']
+        privada_pem = serialization.load_pem_private_key(ast.literal_eval(privada), password=None)
+        if nickname1 == nickname2:
+            public_key = privada_pem.public_key()
+            pem_public = public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+            pem_public.splitlines()[0]
+            data_frame.at[index, 'Key_public'] = pem_public   
+            data_frame.to_excel('./datos_cripto.xlsx', index=False)"""   
 
 #cada lista representa una fila en la pantalla de la app
 layout = [
@@ -86,20 +124,14 @@ while True:
 
             if exito:
                 sg.popup('Autenticado con éxito')
-                """print(row['Nickname'])
-                print(nickname)
-                print(repr(salt))
-                print(repr(ast.literal_eval(salt)))
-                print(key)
-                print(key2)
-                print(contraseña)"""
 
                 #cerramos la ventana de autenticado
                 window.close()
                 
                 #abrir una nueva ventana para enviar o recibir
                 layout_main_ventana = [
-                    [sg.Text('Enviar coordenadas')],
+                    [sg.Text('¿Deseas enviar o recibir coordenadas?')],
+                    [sg.Submit('Enviar'), sg.Submit('Recibir')]
                 ]
                 
                 window_main = sg.Window('Selección de Coordenadas', layout_main_ventana)
@@ -110,17 +142,93 @@ while True:
                         window_main.close()
                         break
 
+                    if event_main == 'Enviar':
+                        window_main.close()
+
+                        layout_enviar = [
+                            [sg.Text('¿A quién quieres enviar tus coordenadas?')],
+                            [sg.Text('Receptor', size=(15, 1)), sg.InputText(key='Receptor')],
+                            [sg.Text('Coordenadas', size=(15, 1)), sg.InputText(key='Coordenadas')],
+                            [sg.Submit('Aceptar'), sg.Exit('Cancelar')]
+                        ]
+
+                        window_enviar = sg.Window('Enviar coordenadas', layout_enviar)
+                        
+                        while True:
+                            event_enviar, values_enviar = window_enviar.read()
+                            if event_enviar == sg.WIN_CLOSED or event_enviar == 'Cancelar':
+                                window_enviar.close()
+                                break
+
+                            elif event_enviar == 'Aceptar':
+                                receptor = values_enviar['Receptor']
+                                coordenadas = values_enviar['Coordenadas']
+                                coordenadas_bytes = coordenadas.encode('utf-8')
+                                if not receptor or not coordenadas:
+                                    sg.popup_error('Tienes que completar todos los campos')        
+                                else:
+
+                                    comp = False
+                                    for index, row in data_frame.iterrows():
+                                        receptor_base = row['Nickname']
+                                        if nickname == receptor:
+                                            break
+                                        elif receptor_base == receptor:
+                                            comp = True
+                                    
+                                    if comp == False:
+                                        sg.popup_error('Receptor no válido')
+                                    
+                                    else:
+                                        """regex_coordenadas = re.compile('^((\-?|\+?)?\d+(\.\d+)?),\s*((\-?|\+?)?\d+(\.\d+)?)$')
+                                        if regex_coordenadas.match(coordenadas) == False:
+                                            sg.popup_error('Coordenada no válida')
+                                        else:
+                                            sg.popup_error('ha entrau')"""
+                                        key_simetrica = Fernet.generate_key()
+                                        f = Fernet(key_simetrica)
+                                        coordenadas_encriptadas = f.encrypt(coordenadas_bytes)
+
+                                        for index, row in data_frame.iterrows():
+                                            receptor_base = row['Nickname']
+                                            if receptor == receptor_base:
+                                                key_public = row['Key_public']
+                                                key_public_pem = serialization.load_pem_public_key(ast.literal_eval(key_public))
+
+                                        for index, row in data_frame2.iterrows():
+                                            receptor_base = row['Nickname']
+                                            if receptor == receptor_base:
+                                                data_frame2.at[index, 'Coordenadas'] = coordenadas_encriptadas
+                                                data_frame2.to_excel('./Coordenadas.xlsx', index=False)
+                                                key_simetrica_cifrada = key_public_pem.encrypt(
+                                                    key_simetrica,
+                                                    padding.OAEP(
+                                                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                                                    algorithm=hashes.SHA256(),
+                                                    label=None
+                                                        )
+                                                    )
+                        
+                                                data_frame2.at[index, 'Key_symmetric'] = key_simetrica_cifrada  
+                                                data_frame2.to_excel('./Coordenadas.xlsx', index=False)
+                            
+                            sg.popup('Coordenadas enviadas con éxito')
+                            window_enviar.close()
+                                                
+                                                
+                                                
+
+
+
+                                            
+
+
+                                        
+
+                                    
             #si no coinciden
             if not exito:
                 sg.popup_error('Tus datos no coinciden con la base')
-                """print(row['Nickname'])
-                print(nickname)
-                print(repr(salt))
-                print(repr(ast.literal_eval(salt)))
-                print(key)
-                print(key2)
-                print(contraseña)"""
-                clear_input()
-                break
+                clear_input()               
 
 window.close()
