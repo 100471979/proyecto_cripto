@@ -218,54 +218,49 @@ while True:
                     elif(event_main == 'Recibir'):
                         window_main.close()
 
-                        
                         for index, row in data_frame2.iterrows():
                             nickname_base = row['Nickname']
                             if nickname == nickname_base:
                                 key_simetrica_cifrada = row['Key_symmetric']
-                        
-                        for index, row in data_frame3.iterrows():
-                            nickname_base = row['Nickname']
-                            if nickname == nickname_base:
-                                privada = row['Privadas']
-                        
-                        for index, row in data_frame2.iterrows():
-                            nickname_base = row['Nickname']
-                            if nickname == nickname_base:
                                 coordenadas_cifradas = row['Coordenadas']
                         
-                        coordenadas_cifradas_bytes = ast.literal_eval(coordenadas_cifradas)
-                        key_simetrica_cifrada_bytes = ast.literal_eval(key_simetrica_cifrada)
-                        print(len(key_simetrica_cifrada_bytes))
-                        privada_pem = serialization.load_pem_private_key(ast.literal_eval(privada), password=None)
-                        
-                        key_simetrica_descifrada = privada_pem.decrypt(
-                                    key_simetrica_cifrada_bytes,
-                                    padding.OAEP(
-                                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                                    algorithm=hashes.SHA256(),
-                                    label=None
+                        if pd.isna(coordenadas_cifradas):
+                            sg.popup("Todavía no se te han enviado coordenadas")
+                        else:
+                            for index, row in data_frame3.iterrows():
+                                nickname_base = row['Nickname']
+                                if nickname == nickname_base:
+                                    privada = row['Privadas']
+
+                            coordenadas_cifradas_bytes = ast.literal_eval(coordenadas_cifradas)
+                            key_simetrica_cifrada_bytes = ast.literal_eval(key_simetrica_cifrada)
+                            privada_pem = serialization.load_pem_private_key(ast.literal_eval(privada), password=None)
+                            
+                            key_simetrica_descifrada = privada_pem.decrypt(
+                                        key_simetrica_cifrada_bytes,
+                                        padding.OAEP(
+                                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                                        algorithm=hashes.SHA256(),
+                                        label=None
+                                        )
                                     )
-                                )
-                        f =  Fernet(key_simetrica_descifrada)
-                        coordenada_descifrada = f.decrypt(coordenadas_cifradas_bytes)
-                        coordenadas_str = str(coordenada_descifrada)
-                        cadena_str = coordenadas_str[2:-1]
-                        
-                        layout_recibir = [
-                            [sg.Text('Tus coordenadas son:' + cadena_str)],
-                            [sg.Submit('Aceptar'), sg.Exit('Cancelar')]
-                        ]
+                            f =  Fernet(key_simetrica_descifrada)
+                            coordenada_descifrada = f.decrypt(coordenadas_cifradas_bytes)
+                            coordenadas_str = str(coordenada_descifrada)
+                            cadena_str = coordenadas_str[2:-1]
+                            
+                            layout_recibir = [
+                                [sg.Text('Tus coordenadas son:' + cadena_str)],
+                                [sg.Submit('Aceptar'), sg.Exit('Cancelar')]
+                            ]
 
-                        window_recibir = sg.Window('Recibir coordenadas', layout_recibir)
+                            window_recibir = sg.Window('Recibir coordenadas', layout_recibir)
 
-                        while True:
-                            event_recibir, values_recibir = window_recibir.read()
-                            if event_recibir == sg.WIN_CLOSED or event_recibir == 'Cancelar':
-                                window_recibir.close()
-                                break
-
-
+                            while True:
+                                event_recibir, values_recibir = window_recibir.read()
+                                if event_recibir == sg.WIN_CLOSED or event_recibir == 'Cancelar' or event_recibir == 'Aceptar':
+                                    window_recibir.close()
+                                    break
 
             #si no coinciden
             if not exito:
