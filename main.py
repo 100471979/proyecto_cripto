@@ -3,6 +3,7 @@ import re
 import ast
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
@@ -21,22 +22,25 @@ data_frame = pd.read_excel(EXCEL_FILE)
 data_frame2 = pd.read_excel("./Coordenadas.xlsx")
 data_frame3 = pd.read_excel("./Claves_privadas.xlsx")
 
+#CODIGO PARA ENCRIPTAR LAS CONTRASEÑAS
 """for index, row in data_frame.iterrows():
     salt = os.urandom(16)
     contraseña = row['Contraseña']
     contraseña_bytes = contraseña.encode('utf-8')
     data_frame.at[index, 'Salt'] = salt
     data_frame.to_excel('./datos_cripto.xlsx', index=False)
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
+    kdf = Scrypt(
         salt=salt,
-        iterations=480000,
-        )
+        length=32,
+        n=2**14,
+        r=8,
+        p=1,
+    )
     key = kdf.derive(contraseña_bytes)
     data_frame.at[index, 'Key'] = key
     data_frame.to_excel('./datos_cripto.xlsx', index=False)"""
 
+#CODIGO PARA GENERAR LAS CLAVES PRIVADAS DE CADA USUARIO 
 """for index, row in data_frame3.iterrows():
     private_key = rsa.generate_private_key(
     public_exponent=65537,
@@ -47,11 +51,11 @@ data_frame3 = pd.read_excel("./Claves_privadas.xlsx")
     format=serialization.PrivateFormat.PKCS8,
     encryption_algorithm=serialization.NoEncryption()
     )
-
     pem.splitlines()[0]
     data_frame3.at[index, 'Privadas'] = pem
     data_frame3.to_excel('./Claves_privadas.xlsx', index=False)"""
 
+#CODIGO PARA OBTENER LA CALVE PÚBLICA DE CADA USUARIO Y GUARDARLA EN LA BASE DE DATOS
 """for index, row in data_frame.iterrows():
     nickname1 = row['Nickname']
     for index, row in data_frame3.iterrows():
@@ -84,7 +88,14 @@ def clear_input():
     for key in values:
         window[key]('')
     return None
-        
+
+def validar_coordenadas(coordenadas):
+    rgx = r'^-?([0-9]|[1-8][0-9]|90)(\.\d{1,6})?,\s?-?((0|1[0-7][0-9]|[0-9]{1,2})|180)(\.\d{1,6})?$'
+    if re.match(rgx, coordenadas):
+        return True
+    else:
+        return False
+
 while True:
     event, values = window.read()   
     if event == sg.WIN_CLOSED or event == 'Salir':
@@ -107,13 +118,14 @@ while True:
             #recorremos el excel y vemos si hay alguna coincidencia de usuarios y contraseñas en la base de datos
             for index, row in data_frame.iterrows():
                 salt = row['Salt']
-                key = ast.literal_eval(row['Key'])
-                kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=ast.literal_eval(salt),
-                iterations=480000,
-                )
+                key = ast.literal_eval(row['Key']) 
+                kdf = Scrypt(
+                    salt=ast.literal_eval(salt),
+                    length=32,
+                    n=2**14,
+                    r=8,
+                    p=1,
+                )              
                 key2 = kdf.derive(contraseña_bytes)
                 
                 #si coinciden
@@ -121,7 +133,6 @@ while True:
                     exito = True
                     #se sale del for
                     break
-
             if exito:
                 sg.popup('Autenticado con éxito')
 
@@ -180,40 +191,36 @@ while True:
                                         sg.popup_error('Receptor no válido')
                                     
                                     else:
-                                        """regex_coordenadas = re.compile('^((\-?|\+?)?\d+(\.\d+)?),\s*((\-?|\+?)?\d+(\.\d+)?)$')
-                                        if regex_coordenadas.match(coordenadas) == False:
+                                        if validar_coordenadas(coordenadas) == False:
                                             sg.popup_error('Coordenada no válida')
-                                        else:
-                                            sg.popup_error('ha entrau')"""
-                                        key_simetrica = Fernet.generate_key()
-                                        f = Fernet(key_simetrica)
-                                        coordenadas_encriptadas = f.encrypt(coordenadas_bytes)
+                                        else:                                         
+                                            key_simetrica = Fernet.generate_key()
+                                            f = Fernet(key_simetrica)
+                                            coordenadas_encriptadas = f.encrypt(coordenadas_bytes)
 
-                                        for index, row in data_frame.iterrows():
-                                            receptor_base = row['Nickname']
-                                            if receptor == receptor_base:
-                                                key_public = row['Key_public']
-                                                key_public_pem = serialization.load_pem_public_key(ast.literal_eval(key_public))
+                                            for index, row in data_frame.iterrows():
+                                                receptor_base = row['Nickname']
+                                                if receptor == receptor_base:
+                                                    key_public = row['Key_public']
+                                                    key_public_pem = serialization.load_pem_public_key(ast.literal_eval(key_public))
 
-                                        for index, row in data_frame2.iterrows():
-                                            receptor_base = row['Nickname']
-                                            if receptor == receptor_base:
-                                                data_frame2.at[index, 'Coordenadas'] = coordenadas_encriptadas
-                                                data_frame2.to_excel('./Coordenadas.xlsx', index=False)
-                                                key_simetrica_cifrada = key_public_pem.encrypt(
-                                                    key_simetrica,
-                                                    padding.OAEP(
-                                                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                                                    algorithm=hashes.SHA256(),
-                                                    label=None
+                                            for index, row in data_frame2.iterrows():
+                                                receptor_base = row['Nickname']
+                                                if receptor == receptor_base:
+                                                    data_frame2.at[index, 'Coordenadas'] = coordenadas_encriptadas
+                                                    data_frame2.to_excel('./Coordenadas.xlsx', index=False)
+                                                    key_simetrica_cifrada = key_public_pem.encrypt(
+                                                        key_simetrica,
+                                                        padding.OAEP(
+                                                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                                                        algorithm=hashes.SHA256(),
+                                                        label=None
+                                                            )
                                                         )
-                                                    )
-                                                data_frame2.at[index, 'Key_symmetric'] = key_simetrica_cifrada  
-                                                data_frame2.to_excel('./Coordenadas.xlsx', index=False)
-                                        
-                            
-                            sg.popup('Coordenadas enviadas con éxito')
-                            window_enviar.close()
+                                                    data_frame2.at[index, 'Key_symmetric'] = key_simetrica_cifrada  
+                                                    data_frame2.to_excel('./Coordenadas.xlsx', index=False)
+                                            sg.popup('Coordenadas enviadas con éxito')
+                                            window_enviar.close()
 
                     elif(event_main == 'Recibir'):
                         window_main.close()
