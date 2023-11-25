@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 import pandas as pd
 import PySimpleGUI as sg
 
+#firmar clave simetrica
 
 #color de la ventana
 sg.theme('DarkRed')
@@ -127,7 +128,7 @@ while True:
                     p=1,
                 )              
                 key2 = kdf.derive(contraseña_bytes)
-                
+
                 #si coinciden
                 if row['Nickname'] == nickname and key == key2:               
                     exito = True
@@ -175,6 +176,19 @@ while True:
                                 receptor = values_enviar['Receptor']
                                 coordenadas = values_enviar['Coordenadas']
                                 coordenadas_bytes = coordenadas.encode('utf-8')
+                                for index, row in data_frame3.iterrows():
+                                    if nickname == row['Nickname']:
+                                        privada = row['Privadas']
+                                privada_pem = serialization.load_pem_private_key(ast.literal_eval(privada), password=None)
+                                signature = privada_pem.sign(
+                                    coordenadas_bytes,
+                                    padding.PSS(
+                                        mgf=padding.MGF1(hashes.SHA256()),
+                                        salt_length=padding.PSS.MAX_LENGTH
+                                    ),
+                                    hashes.SHA256()
+                                )
+
                                 if not receptor or not coordenadas:
                                     sg.popup_error('Tienes que completar todos los campos')        
                                 else:
@@ -219,6 +233,8 @@ while True:
                                                         )
                                                     data_frame2.at[index, 'Key_symmetric'] = key_simetrica_cifrada  
                                                     data_frame2.to_excel('./Coordenadas.xlsx', index=False)
+                                                    data_frame2.at[index, 'Firma'] = signature
+                                                    data_frame2.to_excel('./Coordenadas.xlsx', index=False)
                                             sg.popup('Coordenadas enviadas con éxito')
                                             window_enviar.close()
 
@@ -230,7 +246,11 @@ while True:
                             if nickname == nickname_base:
                                 key_simetrica_cifrada = row['Key_symmetric']
                                 coordenadas_cifradas = row['Coordenadas']
-                        
+
+                        for index, row in data_frame.iterrows():
+                            if nickname == row['Nickname']:
+                                publica = row['Key_public']
+                             
                         if pd.isna(coordenadas_cifradas):
                             sg.popup("Todavía no se te han enviado coordenadas")
                         else:
