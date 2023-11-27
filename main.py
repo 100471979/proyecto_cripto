@@ -9,19 +9,22 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography import x509
+from cryptography.x509.oid import NameOID
 import pandas as pd
 import PySimpleGUI as sg
+import datetime
 
 #firmar clave simetrica
 
 #color de la ventana
 sg.theme('DarkRed')
 
-
 EXCEL_FILE = './datos_cripto.xlsx'
 data_frame = pd.read_excel(EXCEL_FILE)
 data_frame2 = pd.read_excel("./Coordenadas.xlsx")
 data_frame3 = pd.read_excel("./Claves_privadas.xlsx")
+data_frame4 = pd.read_excel("./Autoridades.xlsx")
 
 #CODIGO PARA ENCRIPTAR LAS CONTRASEÑAS
 """for index, row in data_frame.iterrows():
@@ -73,9 +76,112 @@ data_frame3 = pd.read_excel("./Claves_privadas.xlsx")
             data_frame.at[index, 'Key_public'] = pem_public  
             data_frame.to_excel('./datos_cripto.xlsx', index=False)"""
 
+#GENERACIÓN DE CLAVES PRIVADAS DE LOS CA
+"""for index, row in data_frame4.iterrows():
+    private_key = rsa.generate_private_key(
+    public_exponent=65537,
+    key_size=2048,
+    )
+    pem = private_key.private_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PrivateFormat.PKCS8,
+    encryption_algorithm=serialization.NoEncryption()
+    )
+    pem.splitlines()[0]
+    data_frame4.at[index, 'Privada'] = pem
+    data_frame4.to_excel('./Autoridades.xlsx', index=False)"""
+
+# GENERACIÓN DE CLAVE PÚBLICA DE LOS CA
+"""for index, row in data_frame4.iterrows():
+    nickname1 = row['Autoridad']       
+    privada = row['Privada']
+    privada_pem = serialization.load_pem_private_key(ast.literal_eval(privada), password=None)
+    
+    public_key = privada_pem.public_key()
+    pem_public = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    pem_public.splitlines()[0]
+    data_frame4.at[index, 'Publica'] = pem_public  
+    data_frame4.to_excel('./Autoridades.xlsx', index=False)"""
+
+# CÓDIGO PARA GENERAR EL CERTIFICADO AUTOFIRMADO DE LA ENTIDAD RAÍZ Y GENERAR LAS CSR
+
+for index, row in data_frame4.iterrows():
+    privada_autoridad = row["Privada"] 
+    autoridad_nombre = row["Autoridad"]
+    numero = 1
+    if autoridad_nombre == "Máxima":
+        privada_raiz = row["Privada"] 
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "JP"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "East Blue"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, "La mar"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Barba Negra Corp."),
+        ])
+        privada_autoridad_pem = serialization.load_pem_private_key(ast.literal_eval(privada_autoridad), password=None)
+        certificado_raiz = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            issuer
+        ).public_key(
+            privada_autoridad_pem.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.datetime.now(datetime.timezone.utc)
+        ).not_valid_after(
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=10)
+        ).add_extension(
+            x509.SubjectAlternativeName([x509.DNSName("localhost")]),
+            critical=False,
+        ).sign(privada_autoridad_pem, hashes.SHA256())
+
+        data_frame4.at[index, 'Certificado'] = certificado_raiz
+        data_frame4.to_excel('./Autoridades.xlsx', index=False)
+    else:
+        privada_autoridad_pem = serialization.load_pem_private_key(ast.literal_eval(privada_autoridad), password=None)
+        csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
+            # Provide various details about who we are.
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "JP"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "North Blue"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, "La mar del norte"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Subordinada corp." + str(numero)),
+        ])).add_extension(
+            x509.SubjectAlternativeName([
+            ]),
+            critical=False,
+        # Sign the CSR with our private key.
+        ).sign(privada_autoridad_pem, hashes.SHA256())
+        numero += 1
+        csr_pem = csr.public_bytes(encoding=serialization.Encoding.PEM)
+
+        subordinada_certificado = x509.CertificateBuilder().subject_name(
+            csr.subject
+        ).issuer_name(
+            certificado_raiz.subject  
+        ).public_key(
+            csr.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.datetime.now(datetime.timezone.utc)
+        ).not_valid_after(
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365)
+        ).add_extension(
+            x509.BasicConstraints(ca=True, path_length=0), critical=True
+        ).sign(serialization.load_pem_private_key(ast.literal_eval(privada_raiz), password=None), hashes.SHA256(), default_backend())
+
+        # Serializar el certificado para almacenarlo o distribuirlo
+        subordinada_certificado_pem = subordinada_certificado.public_bytes(serialization.Encoding.PEM)
+        data_frame4.at[index, 'solicitud'] = csr_pem  
+        data_frame4.to_excel('./Autoridades.xlsx', index=False)
+        data_frame4.at[index, 'Certificado'] = subordinada_certificado_pem
+        data_frame4.to_excel('./Autoridades.xlsx', index=False)
+        
 #cada lista representa una fila en la pantalla de la app
 layout = [
-
     [sg.Text('Por favor rellene con sus datos:')],
     [sg.Text('Nickname', size=(15, 1)), sg.InputText(key='Nickname')],
     [sg.Text('Contraseña', size=(15, 1)), sg.InputText(key='Contraseña', password_char='•')],
@@ -175,6 +281,7 @@ while True:
                             elif event_enviar == 'Aceptar':
                                 receptor = values_enviar['Receptor']
                                 coordenadas = values_enviar['Coordenadas']
+                                
                                 coordenadas_bytes = coordenadas.encode('utf-8')
                                 for index, row in data_frame3.iterrows():
                                     if nickname == row['Nickname']:
@@ -216,8 +323,9 @@ while True:
                                                 receptor_base = row['Nickname']
                                                 if receptor == receptor_base:
                                                     key_public = row['Key_public']
+                                
                                                     key_public_pem = serialization.load_pem_public_key(ast.literal_eval(key_public))
-
+                                            
                                             for index, row in data_frame2.iterrows():
                                                 receptor_base = row['Nickname']
                                                 if receptor == receptor_base:
@@ -235,6 +343,8 @@ while True:
                                                     data_frame2.to_excel('./Coordenadas.xlsx', index=False)
                                                     data_frame2.at[index, 'Firma'] = signature
                                                     data_frame2.to_excel('./Coordenadas.xlsx', index=False)
+                                                    data_frame2.at[index, 'Emisor'] = nickname  
+                                                    data_frame2.to_excel('./Coordenadas.xlsx', index=False)
                                             sg.popup('Coordenadas enviadas con éxito')
                                             window_enviar.close()
 
@@ -246,11 +356,12 @@ while True:
                             if nickname == nickname_base:
                                 key_simetrica_cifrada = row['Key_symmetric']
                                 coordenadas_cifradas = row['Coordenadas']
-
+                                emisor = row['Emisor']
+                                firma = row['Firma']
                         for index, row in data_frame.iterrows():
-                            if nickname == row['Nickname']:
-                                publica = row['Key_public']
-                             
+                            if emisor == row['Nickname']:
+                                emisor_public = row['Key_public']
+                        
                         if pd.isna(coordenadas_cifradas):
                             sg.popup("Todavía no se te han enviado coordenadas")
                         else:
@@ -262,6 +373,8 @@ while True:
                             coordenadas_cifradas_bytes = ast.literal_eval(coordenadas_cifradas)
                             key_simetrica_cifrada_bytes = ast.literal_eval(key_simetrica_cifrada)
                             privada_pem = serialization.load_pem_private_key(ast.literal_eval(privada), password=None)
+                            
+                            emisor_public_pem = serialization.load_pem_public_key(ast.literal_eval(emisor_public))
                             
                             key_simetrica_descifrada = privada_pem.decrypt(
                                         key_simetrica_cifrada_bytes,
@@ -276,6 +389,25 @@ while True:
                             coordenadas_str = str(coordenada_descifrada)
                             cadena_str = coordenadas_str[2:-1]
                             
+                            try: 
+                                print("Intentando verificar la firma...")
+                                
+                                verification_result = emisor_public_pem.verify(
+                                    ast.literal_eval(firma),
+                                    coordenada_descifrada,
+                                    padding.PSS(
+                                        mgf=padding.MGF1(hashes.SHA256()),
+                                        salt_length=padding.PSS.MAX_LENGTH
+                                    ),
+                                    hashes.SHA256()
+                                )
+                                if verification_result is None:
+                                    print("La firma se ha verificado correctamente.")
+                                else:
+                                    print("Error al verificar la firma: La verificación no devolvió 'None'")
+                            except Exception as e:
+                                print("Error al verificar la firma:", str(e))
+                            
                             layout_recibir = [
                                 [sg.Text('Tus coordenadas son:' + cadena_str)],
                                 [sg.Submit('Aceptar'), sg.Exit('Cancelar')]
@@ -288,7 +420,6 @@ while True:
                                 if event_recibir == sg.WIN_CLOSED or event_recibir == 'Cancelar' or event_recibir == 'Aceptar':
                                     window_recibir.close()
                                     break
-
             #si no coinciden
             if not exito:
                 sg.popup_error('Tus datos no coinciden con la base')
