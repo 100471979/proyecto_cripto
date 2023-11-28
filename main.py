@@ -108,7 +108,7 @@ data_frame4 = pd.read_excel("./Autoridades.xlsx")
 
 # CÓDIGO PARA GENERAR EL CERTIFICADO AUTOFIRMADO DE LA ENTIDAD RAÍZ Y GENERAR LAS CSR
 
-for index, row in data_frame4.iterrows():
+"""for index, row in data_frame4.iterrows():
     privada_autoridad = row["Privada"] 
     autoridad_nombre = row["Autoridad"]
     numero = 1
@@ -178,8 +178,99 @@ for index, row in data_frame4.iterrows():
         data_frame4.at[index, 'solicitud'] = csr_pem  
         data_frame4.to_excel('./Autoridades.xlsx', index=False)
         data_frame4.at[index, 'Certificado'] = subordinada_certificado_pem
-        data_frame4.to_excel('./Autoridades.xlsx', index=False)
+        data_frame4.to_excel('./Autoridades.xlsx', index=False)"""
+
+"""for index_usuario, row_usuario in data_frame3.iterrows():
+    privada_usuario = row_usuario["Privadas"] 
+    nombre_usuario = row_usuario["Nickname"]
+    autoridad_usuario = row_usuario["Entidad"]
+    for index_entidad, row_entidad in data_frame4.iterrows():
+        entidad = row_entidad["Autoridad"]
+        privada_autoridad = row_entidad["Privada"]
+        certificado_autoridad = row_entidad["Certificado"]
         
+        if autoridad_usuario == 1 and entidad == "Subordinada_1":
+            print("all")
+            certificado_autoridad_pem = x509.load_pem_x509_certificate(ast.literal_eval(certificado_autoridad), default_backend())
+            privada_usuario_pem = serialization.load_pem_private_key(ast.literal_eval(privada_usuario), password=None)
+            subject_usuario = x509.Name([
+                x509.NameAttribute(NameOID.COUNTRY_NAME, "KR"),
+                x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Thousand Sunny"),
+                x509.NameAttribute(NameOID.LOCALITY_NAME, "La mar"),
+                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Piratas anónimos"),
+                x509.NameAttribute(NameOID.COMMON_NAME, nombre_usuario),
+            ])
+            csr_usuario = x509.CertificateSigningRequestBuilder().subject_name(
+                subject_usuario
+            ).add_extension(
+                x509.SubjectAlternativeName([x509.DNSName("localhost")]),
+                critical=False,
+            ).sign(privada_usuario_pem, hashes.SHA256(), default_backend())
+
+            data_frame.at[index_usuario, 'Solicitud'] = csr_usuario.public_bytes(serialization.Encoding.PEM)
+            data_frame.to_excel('./datos_cripto.xlsx', index=False)
+            
+            certificado_usuario = x509.CertificateBuilder().subject_name(
+                subject_usuario
+            ).issuer_name(
+                certificado_autoridad_pem.subject  # El usuario es su propio emisor en este ejemplo
+            ).public_key(
+                csr_usuario.public_key()
+            ).serial_number(
+                x509.random_serial_number()
+            ).not_valid_before(
+                datetime.datetime.now(datetime.timezone.utc)
+            ).not_valid_after(
+                datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365)
+            ).add_extension(
+                x509.SubjectAlternativeName([x509.DNSName("localhost")]),
+                critical=False,
+            ).sign(serialization.load_pem_private_key(ast.literal_eval(privada_autoridad), password=None), hashes.SHA256())
+
+            data_frame.at[index_usuario, 'Certificado'] = certificado_usuario.public_bytes(serialization.Encoding.PEM)
+            data_frame.to_excel('./datos_cripto.xlsx', index=False)
+        
+        elif autoridad_usuario == 2 and entidad == "Subordinada_2":
+            certificado_autoridad_pem = x509.load_pem_x509_certificate(ast.literal_eval(certificado_autoridad), default_backend())
+            privada_usuario_pem = serialization.load_pem_private_key(ast.literal_eval(privada_usuario), password=None)
+            subject_usuario = x509.Name([
+                x509.NameAttribute(NameOID.COUNTRY_NAME, "KR"),
+                x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Thousand Sunny"),
+                x509.NameAttribute(NameOID.LOCALITY_NAME, "La mar"),
+                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Piratas anónimos"),
+                x509.NameAttribute(NameOID.COMMON_NAME, nombre_usuario),
+            ])
+            csr_usuario = x509.CertificateSigningRequestBuilder().subject_name(
+                subject_usuario
+            ).add_extension(
+                x509.SubjectAlternativeName([x509.DNSName("localhost")]),
+                critical=False,
+            ).sign(privada_usuario_pem, hashes.SHA256(), default_backend())
+
+            data_frame.at[index_usuario, 'Solicitud'] = csr_usuario.public_bytes(serialization.Encoding.PEM)
+            data_frame.to_excel('./datos_cripto.xlsx', index=False)
+            
+            certificado_usuario = x509.CertificateBuilder().subject_name(
+                subject_usuario
+            ).issuer_name(
+                certificado_autoridad_pem.subject  # El usuario es su propio emisor en este ejemplo
+            ).public_key(
+                csr_usuario.public_key()
+            ).serial_number(
+                x509.random_serial_number()
+            ).not_valid_before(
+                datetime.datetime.now(datetime.timezone.utc)
+            ).not_valid_after(
+                datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365)
+            ).add_extension(
+                x509.SubjectAlternativeName([x509.DNSName("localhost")]),
+                critical=False,
+            ).sign(serialization.load_pem_private_key(ast.literal_eval(privada_autoridad), password=None), hashes.SHA256())
+
+            data_frame.at[index_usuario, 'Certificado'] = certificado_usuario.public_bytes(serialization.Encoding.PEM)
+            data_frame.to_excel('./datos_cripto.xlsx', index=False)"""
+
+
 #cada lista representa una fila en la pantalla de la app
 layout = [
     [sg.Text('Por favor rellene con sus datos:')],
